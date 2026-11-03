@@ -1,0 +1,119 @@
+=============================================================================
+PROJETO INTEGRADOR — RESTAURANTE AURÉA (ALTA GASTRONOMIA)
+ESTRUTURA COMPLETA DO BANCO DE DADOS: db_aurea
+=============================================================================
+
+1. CONTEXTO & REQUISITOS DO SISTEMA
+O restaurante Auréa é um restaurante de grande porte e luxo que opera
+exclusivamente por meio de reservas online. O cliente autenticado escolhe data,
+horário, quantidade de pessoas e mesa disponível. Ao confirmar, o sistema gera
+um CÓDIGO ÚNICO DE RESERVA (ex: AUR-20241015-8492) utilizado para identificar o
+cliente no tablet disponibilizado na mesa ao chegar no restaurante.
+
+=============================================================================
+2. ESPECIFICAÇÃO DAS TABELAS & CHAVES ESTRANGEIRAS (FOREIGN KEYS)
+=============================================================================
+
+1) tbl_categorias_cardapio
+- id_categoria INT PRIMARY KEY AUTO_INCREMENT
+- nome_categoria VARCHAR(100) NOT NULL
+- descricao_categoria TEXT
+- icone_categoria VARCHAR(50) (Classe Bootstrap Icons, ex: bi-egg-fried, bi-fire, bi-water)
+- ordem INT NOT NULL DEFAULT 0
+- ativo TINYINT(1) NOT NULL DEFAULT 1
+- criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+2) tbl_pratos
+- id_prato INT PRIMARY KEY AUTO_INCREMENT
+- id_categoria INT NOT NULL (FOREIGN KEY -> tbl_categorias_cardapio(id_categoria))
+- nome_prato VARCHAR(150) NOT NULL
+- descricao_prato TEXT
+- ingredientes TEXT
+- preco DECIMAL(10,2) NOT NULL DEFAULT 0.00
+- foto_prato VARCHAR(255) NOT NULL DEFAULT 'sem-foto.jpg'
+- restricoes VARCHAR(255) (Ex: vegetariano, sem glúten, vegano)
+- destaque TINYINT(1) NOT NULL DEFAULT 0 (1 = exibe na Home na Coleção Signature)
+- disponivel TINYINT(1) NOT NULL DEFAULT 1
+- criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+3) tbl_clientes
+- id_cliente INT PRIMARY KEY AUTO_INCREMENT
+- nome_cliente VARCHAR(150) NOT NULL
+- email_cliente VARCHAR(150) NOT NULL UNIQUE
+- telefone_cliente VARCHAR(20)
+- senha_cliente VARCHAR(255) NOT NULL (Hash bcrypt via password_hash)
+- ativo TINYINT(1) NOT NULL DEFAULT 1
+- criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+4) tbl_mesas
+- id_mesa INT PRIMARY KEY AUTO_INCREMENT
+- numero_mesa INT NOT NULL UNIQUE
+- capacidade INT NOT NULL (Capacidade máxima de pessoas: 2, 4, 6 ou 8)
+- localizacao VARCHAR(100) (Ex: 'Salão Principal', 'Terraço', 'Jardim Interno', 'Área VIP')
+- descricao TEXT
+- ativa TINYINT(1) NOT NULL DEFAULT 1
+
+5) tbl_horarios_funcionamento
+- id_horario INT PRIMARY KEY AUTO_INCREMENT
+- dia_semana TINYINT(1) NOT NULL UNIQUE (0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sáb)
+- hora_abertura TIME NOT NULL
+- hora_fechamento TIME NOT NULL
+- ativo TINYINT(1) NOT NULL DEFAULT 1 (Segunda-feira: ativo=0 / fechado)
+
+6) tbl_reservas (TABELA CENTRAL)
+- id_reserva INT PRIMARY KEY AUTO_INCREMENT
+- id_cliente INT NOT NULL (FOREIGN KEY -> tbl_clientes(id_cliente))
+- id_mesa INT NOT NULL (FOREIGN KEY -> tbl_mesas(id_mesa))
+- codigo_reserva VARCHAR(20) NOT NULL UNIQUE (Ex: AUR-20241015-8492)
+- data_reserva DATE NOT NULL
+- hora_inicio TIME NOT NULL
+- hora_fim TIME NOT NULL (Calculado como hora_inicio + 2 horas)
+- qtd_pessoas INT NOT NULL
+- status_reserva ENUM('confirmada','cancelada','concluida','no_show') NOT NULL DEFAULT 'confirmada'
+- observacoes TEXT
+- cancelamento_motivo TEXT
+- cancelado_em DATETIME NULL
+- criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+- CONSTRAINT DE SEGURANÇA: UNIQUE KEY (id_mesa, data_reserva, hora_inicio) para impedir conflito de ocupação (double-booking).
+
+7) tbl_funcionarios
+- id_funcionario INT PRIMARY KEY AUTO_INCREMENT
+- nome_funcionario VARCHAR(150) NOT NULL
+- email_funcionario VARCHAR(150) NOT NULL UNIQUE
+- senha_funcionario VARCHAR(255) NOT NULL (Hash bcrypt)
+- cargo VARCHAR(100) (Ex: 'Gerente', 'Sommelier', 'Recepcionista')
+- ativo TINYINT(1) NOT NULL DEFAULT 1
+- criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+8) tbl_feedbacks
+- id_feedback INT PRIMARY KEY AUTO_INCREMENT
+- id_cliente INT NOT NULL (FOREIGN KEY -> tbl_clientes(id_cliente))
+- id_reserva INT NULL (FOREIGN KEY -> tbl_reservas(id_reserva))
+- nota INT NOT NULL CHECK (nota BETWEEN 1 AND 5)
+- comentario TEXT
+- aprovado TINYINT(1) NOT NULL DEFAULT 0
+- criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+=============================================================================
+3. CONTROLLERS E MODELS IMPLEMENTADOS NA PASTA APP
+=============================================================================
+
+MODELS:
+- Prato.php: getPratosDestaque(), getTodosPratos(), getPratosPorCategoria(), getCategorias(), getPratoById()
+- Cliente.php: cadastrar(), buscarPorEmail(), verificarEmailExiste(), buscarPorId(), atualizarDados()
+- Mesa.php: getTodasMesas(), getMesaById(), getMesasDisponiveis(), verificarDisponibilidade()
+- Reserva.php: criarReserva() com transação e lock, getReservasPorCliente(), getReservaById(), getReservaPorCodigo(), cancelarReserva() com validação de 2h de antecedência, verificarHorarioFuncionamento()
+- Feedback.php: getFeedbacksAprovados()
+
+CONTROLLERS:
+- HomeController.php: Carrega coleção Signature e avaliações reais
+- CardapioController.php: Categorias e pratos com filtros dinâmicos
+- ReservaController.php: Wizard de 3 passos, validação de horários AJAX, seleção de mesas AJAX e geração de código único
+- LocalizacaoController.php: Mapa, rotas de chegada, horários e contatos
+- LoginController.php: Autenticação e cadastro com hash bcrypt e CSRF
+- ClienteController.php: Painel de reservas (ativas / histórico), cancelamento com prazo mínimo e minha conta
+- ErroController.php: Página 404 personalizada
+
+ARQUIVO SQL DISPONÍVEL NA RAIZ:
+-> c:\xampp\htdocs\aurea\db_aurea.sql
+(Pronto para ser importado diretamente no MySQL Workbench ou phpMyAdmin)
